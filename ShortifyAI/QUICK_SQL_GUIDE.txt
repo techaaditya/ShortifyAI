@@ -1,0 +1,45 @@
+🎯 QUICK GUIDE: Running SQL Script in Supabase
+
+📌 **SUPER SIMPLE STEPS:**
+
+1️⃣ **Go to supabase.com**
+   - Click "Sign in" 
+   - Log into your account
+
+2️⃣ **Find your ShortifyAI project**
+   - You'll see a list of projects
+   - Click on your project
+
+3️⃣ **Open SQL Editor**
+   - Look at the left menu
+   - Click "SQL Editor" (has </> icon)
+
+4️⃣ **Start new query**
+   - Click "New query" button
+   - Or look for a "+" button
+
+5️⃣ **Copy & Paste**
+   - Open the file: auth_setup.sql
+   - Select ALL (Ctrl+A)
+   - Copy (Ctrl+C)
+   - Paste into Supabase (Ctrl+V)
+
+6️⃣ **RUN IT!**
+   - Click the green "Run" button
+   - Wait 5-10 seconds
+   - Look for "Success" message
+
+🎉 **DONE!** Your database is now set up for authentication!
+
+---
+
+💡 **Can't find SQL Editor?** Look for:
+- "SQL Editor" in sidebar
+- Icon that looks like: </>
+- Sometimes under "Database" section
+
+🔍 **After running, check:**
+- Go to "Table Editor" → You should see "profiles" table
+- No red error messages in results
+
+❓ **Need the SQL script?** It's in your project file: `auth_setup.sql`
