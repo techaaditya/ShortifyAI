@@ -13,9 +13,16 @@ export interface User {
 
 export class AuthService {
   private static instance: AuthService;
-  private supabase = createClient();
+  private _supabase: ReturnType<typeof createClient> | null = null;
 
-  private constructor() {}
+  private get supabase() {
+    if (!this._supabase) {
+      this._supabase = createClient();
+    }
+    return this._supabase;
+  }
+
+  private constructor() { }
 
   public static getInstance(): AuthService {
     if (!AuthService.instance) {
@@ -26,7 +33,7 @@ export class AuthService {
 
   private mapUser(supabaseUser: SupabaseUser | null): User | null {
     if (!supabaseUser) return null;
-    
+
     return {
       id: supabaseUser.id,
       email: supabaseUser.email || '',
@@ -50,9 +57,9 @@ export class AuthService {
       });
 
       if (error) throw error;
-      return { 
-        user: this.mapUser(data.user), 
-        session: data.session 
+      return {
+        user: this.mapUser(data.user),
+        session: data.session
       };
     } catch (error) {
       console.error('Sign up error:', error);
@@ -67,9 +74,9 @@ export class AuthService {
       });
 
       if (error) throw error;
-      return { 
-        user: this.mapUser(data.user), 
-        session: data.session 
+      return {
+        user: this.mapUser(data.user),
+        session: data.session
       };
     } catch (error) {
       console.error('Sign in error:', error);
@@ -85,7 +92,7 @@ export class AuthService {
       console.error('Sign out error:', error);
       throw error;
     }
-  }  async getCurrentUser(): Promise<User | null> {
+  } async getCurrentUser(): Promise<User | null> {
     try {
       const { data: { user }, error } = await this.supabase.auth.getUser();
       if (error) throw error;
@@ -106,7 +113,7 @@ export class AuthService {
     try {
       const { data, error } = await this.supabase
         .rpc('get_current_user_profile');
-      
+
       if (error) throw error;
       return data;
     } catch (error) {
@@ -119,7 +126,7 @@ export class AuthService {
     try {
       const { data, error } = await this.supabase
         .rpc('check_usage_limits');
-      
+
       if (error) throw error;
       return data || false;
     } catch (error) {
@@ -132,7 +139,7 @@ export class AuthService {
     try {
       const { data, error } = await this.supabase
         .rpc('increment_usage');
-      
+
       if (error) throw error;
       return data || false;
     } catch (error) {
@@ -149,7 +156,7 @@ export class AuthService {
         .eq('id', (await this.getCurrentUser())?.id)
         .select()
         .single();
-      
+
       if (error) throw error;
       return data;
     } catch (error) {
