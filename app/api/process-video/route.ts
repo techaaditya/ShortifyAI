@@ -1,88 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase';
+import {
+  validateVideoUrl,
+  fetchVideoMetadata,
+  geminiService,
+  getRecommendedDuration,
+} from '@/lib/video';
 
-// Mock AI processing function
-async function processVideoWithAI(videoUrl: string) {
-  // Simulate processing time
-  await new Promise(resolve => setTimeout(resolve, 3000));
-  
-  // Mock response from AI services
-  return {
-    transcript: "Welcome to today's discussion about AI and the future of work. AI is transforming every industry, and we need to understand how to adapt. The key is to focus on uniquely human skills like creativity, empathy, and complex problem-solving. Don't fear AI, but learn to work alongside it.",
-    highlights: [
-      {
-        start: 0,
-        end: 15,
-        confidence: 0.95,
-        type: "hook",
-        description: "Engaging opening about AI transformation"
-      },
-      {
-        start: 20,
-        end: 35,
-        confidence: 0.89,
-        type: "key_point",
-        description: "Focus on human skills"
-      },
-      {
-        start: 40,
-        end: 52,
-        confidence: 0.92,
-        type: "conclusion",
-        description: "Call to action about AI collaboration"
-      }
-    ],
-    clips: [
-      {
-        id: 1,
-        title: "Hook: AI vs Human Debate",
-        startTime: 0,
-        endTime: 15,
-        duration: 15,
-        confidence: 95,
-        thumbnail: "https://images.pexels.com/photos/8761569/pexels-photo-8761569.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop",
-        captions: [
-          { start: 0, end: 5, text: "Welcome to today's discussion" },
-          { start: 5, end: 10, text: "about AI and the future of work" },
-          { start: 10, end: 15, text: "AI is transforming every industry" }
-        ]
-      },
-      {
-        id: 2,
-        title: "Key Point: Future of Work",
-        startTime: 20,
-        endTime: 35,
-        duration: 15,
-        confidence: 89,
-        thumbnail: "https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop",
-        captions: [
-          { start: 20, end: 25, text: "Focus on uniquely human skills" },
-          { start: 25, end: 30, text: "like creativity and empathy" },
-          { start: 30, end: 35, text: "and complex problem-solving" }
-        ]
-      },
-      {
-        id: 3,
-        title: "Conclusion: Take Action",
-        startTime: 40,
-        endTime: 52,
-        duration: 12,
-        confidence: 92,
-        thumbnail: "https://images.pexels.com/photos/6238297/pexels-photo-6238297.jpeg?auto=compress&cs=tinysrgb&w=300&h=200&fit=crop",
-        captions: [
-          { start: 40, end: 45, text: "Don't fear AI" },
-          { start: 45, end: 50, text: "but learn to work alongside it" },
-          { start: 50, end: 52, text: "for the future" }
-        ]
-      }
-    ]
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface ProcessVideoRequest {
+  videoUrl: string;
+  title?: string;
+  options?: {
+    generateClips?: boolean;
+    clipCount?: number;
+    addCaptions?: boolean;
+    targetPlatform?: 'tiktok' | 'youtube' | 'instagram' | 'linkedin';
   };
 }
 
+// ============================================================================
+// POST - Process Video
+// ============================================================================
+
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { videoUrl, options = {} } = body;
+    const body: ProcessVideoRequest = await request.json();
+    const { videoUrl, title, options = {} } = body;
 
+    // Validate URL
     if (!videoUrl) {
       return NextResponse.json(
         { error: 'Video URL is required' },
@@ -90,33 +39,101 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate URL format (basic validation)
-    try {
-      new URL(videoUrl);
-    } catch {
+    // Validate video URL format and platform
+    const urlValidation = validateVideoUrl(videoUrl);
+
+    if (!urlValidation.isValid) {
       return NextResponse.json(
-        { error: 'Invalid video URL format' },
+        {
+          error: 'Invalid video URL',
+          details: urlValidation.error,
+          supportedPlatforms: ['YouTube', 'TikTok', 'Instagram', 'Twitter/X', 'Facebook', 'LinkedIn']
+        },
         { status: 400 }
       );
     }
 
-    // Process video with AI
-    const result = await processVideoWithAI(videoUrl);
+    // Fetch video metadata
+    const metadata = await fetchVideoMetadata(videoUrl);
+
+    if (!metadata) {
+      return NextResponse.json(
+        { error: 'Failed to fetch video metadata' },
+        { status: 400 }
+      );
+    }
+
+    // Get recommended duration for target platform
+    const targetPlatform = options.targetPlatform || urlValidation.platform;
+    const durationSettings = getRecommendedDuration(targetPlatform);
+
+    // Transcribe and analyze with Gemini
+    const transcription = await geminiService.transcribeVideo(videoUrl);
+
+    const analysis = await geminiService.analyzeContent(
+      transcription.fullText,
+      transcription.duration,
+      {
+        targetPlatform,
+        clipCount: options.clipCount || 3,
+        minClipDuration: durationSettings.min,
+        maxClipDuration: durationSettings.max,
+      }
+    );
+
+    // Store in database (if user is authenticated)
+    // This would be enhanced with actual auth in production
 
     return NextResponse.json({
       success: true,
       data: {
-        videoUrl,
+        videoUrl: urlValidation.cleanUrl,
+        platform: urlValidation.platform,
+        embedUrl: urlValidation.embedUrl,
+        metadata: {
+          title: metadata.title || title || 'Untitled Video',
+          author: metadata.authorName,
+          thumbnailUrl: urlValidation.thumbnailUrl || metadata.thumbnailUrl,
+        },
+        transcription: {
+          fullText: transcription.fullText,
+          segments: transcription.segments,
+          language: transcription.language,
+          duration: transcription.duration,
+          wordCount: transcription.wordCount,
+        },
+        analysis: {
+          summary: analysis.summary,
+          mainTopics: analysis.mainTopics,
+          keyPoints: analysis.keyPoints,
+          sentiment: analysis.sentiment,
+          suggestedHashtags: analysis.suggestedHashtags,
+        },
+        clips: analysis.clipRecommendations.map(clip => ({
+          id: clip.id,
+          title: clip.title,
+          startTime: clip.startTime,
+          endTime: clip.endTime,
+          duration: clip.duration,
+          type: clip.type,
+          confidence: Math.round(clip.confidence * 100),
+          thumbnailUrl: urlValidation.thumbnailUrl,
+          summary: clip.summary,
+          hashtags: clip.hashtags,
+          description: clip.description,
+          viralPotential: clip.viralPotential,
+          targetPlatforms: clip.targetPlatforms,
+        })),
+        highlights: analysis.highlights,
         processedAt: new Date().toISOString(),
-        ...result
       }
     });
 
   } catch (error) {
     console.error('Video processing error:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to process video',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -125,23 +142,38 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// GET endpoint for checking processing status
+// ============================================================================
+// GET - Check Processing Status
+// ============================================================================
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const jobId = searchParams.get('jobId');
+  const projectId = searchParams.get('projectId');
 
-  if (!jobId) {
+  if (!jobId && !projectId) {
     return NextResponse.json(
-      { error: 'Job ID is required' },
+      { error: 'Job ID or Project ID is required' },
       { status: 400 }
     );
   }
 
-  // Mock status response
-  return NextResponse.json({
-    jobId,
-    status: 'completed',
-    progress: 100,
-    message: 'Video processing completed successfully'
-  });
+  try {
+    // In production, check actual job status from database or queue
+    return NextResponse.json({
+      success: true,
+      data: {
+        id: jobId || projectId,
+        status: 'completed',
+        progress: 100,
+        message: 'Video processing completed successfully',
+        completedAt: new Date().toISOString(),
+      }
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: 'Failed to fetch processing status' },
+      { status: 500 }
+    );
+  }
 }
