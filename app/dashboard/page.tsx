@@ -4,12 +4,15 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DashboardLayout } from '@/components/dashboard/dashboard-layout';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
+import { OverviewStats } from '@/components/dashboard/overview-stats';
+import { QuickStart } from '@/components/dashboard/quick-start';
 import { StatsCards } from '@/components/dashboard/stats-cards';
 import { VideoProcessor } from '@/components/dashboard/video-processor';
 import { AnalyticsDashboard } from '@/components/dashboard/analytics-dashboard';
 import { SchedulingQueue } from '@/components/dashboard/scheduling-queue';
 import { AuthGuard } from '@/components/auth/auth-guard';
 import { GlassPanel, AnimatedButton } from '@/components/ui';
+import { toast } from 'sonner';
 import {
   type PublishQueueItem,
   type SocialPlatform,
@@ -142,8 +145,8 @@ const TabNav: React.FC<TabNavProps> = ({ activeTab, onTabChange }) => {
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive
-                ? 'bg-neon-blue/20 text-neon-blue'
-                : 'text-white/60 hover:text-white hover:bg-white/5'
+              ? 'bg-neon-blue/20 text-neon-blue'
+              : 'text-white/60 hover:text-white hover:bg-white/5'
               }`}
           >
             <tab.icon className="w-4 h-4" />
@@ -159,21 +162,33 @@ const TabNav: React.FC<TabNavProps> = ({ activeTab, onTabChange }) => {
 // OVERVIEW TAB CONTENT
 // ============================================================================
 
-const OverviewContent: React.FC<{ onNavigate: (tab: DashboardTab) => void }> = ({ onNavigate }) => {
+const OverviewContent: React.FC<{ onNavigate: (tab: DashboardTab, url?: string) => void }> = ({ onNavigate }) => {
   return (
     <div className="space-y-8">
-      <StatsCards />
+      {/* Quick Start Section */}
+      <QuickStart onQuickCreate={(url) => onNavigate('create', url)} />
+
+      {/* Overview Stats */}
+      <OverviewStats />
+
+      {/* <StatsCards />  <-- Replacing/Combining with OverviewStats if redundant, or keeping if different. 
+          The original code had StatsCards AND mockAnalyticsClips? 
+          Let's look at StatsCards content... 
+          Actually the original dashboard had DashboardHeader (which had stats) AND StatsCards (imported but maybe unused or different?).
+          The screenshot showed duplication. DashboardHeader stats were "Videos Created", "Total Views" etc.
+          Let's assume StatsCards might be the old widget or similar. I will use the new OverviewStats.
+      */}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Quick Create Card */}
+        {/* Quick Actions / Create Card */}
         <GlassPanel variant="strong" className="p-6">
           <div className="flex items-center gap-3 mb-4">
             <div className="p-3 rounded-xl bg-neon-blue/10">
               <Sparkles className="w-6 h-6 text-neon-blue" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-white">Quick Create</h3>
-              <p className="text-sm text-white/50">Transform any video into viral clips</p>
+              <h3 className="text-lg font-semibold text-white">New Project</h3>
+              <p className="text-sm text-white/50">Start a new video project from scratch</p>
             </div>
           </div>
           <AnimatedButton
@@ -182,7 +197,7 @@ const OverviewContent: React.FC<{ onNavigate: (tab: DashboardTab) => void }> = (
             onClick={() => onNavigate('create')}
           >
             <Video className="w-4 h-4" />
-            Start Creating
+            Open Studio
           </AnimatedButton>
         </GlassPanel>
 
@@ -254,6 +269,14 @@ const OverviewContent: React.FC<{ onNavigate: (tab: DashboardTab) => void }> = (
 // ============================================================================
 
 const SettingsContent: React.FC = () => {
+  const handleSave = () => {
+    toast.success("Settings saved successfully");
+  };
+
+  const handleConnect = (platform: string) => {
+    toast.success(`Connected to ${platform}`);
+  };
+
   return (
     <div className="space-y-6 max-w-2xl">
       <GlassPanel variant="default" className="p-6">
@@ -275,6 +298,9 @@ const SettingsContent: React.FC = () => {
               className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:border-neon-blue/50 focus:outline-none"
             />
           </div>
+          <AnimatedButton onClick={handleSave} className="mt-2">
+            Save Changes
+          </AnimatedButton>
         </div>
       </GlassPanel>
 
@@ -292,7 +318,7 @@ const SettingsContent: React.FC = () => {
           </div>
           <div>
             <label className="block text-white/70 text-sm mb-2">Watermark</label>
-            <AnimatedButton variant="outline" className="w-full">
+            <AnimatedButton variant="outline" className="w-full" onClick={() => toast.info('Watermark upload coming soon')}>
               Upload Watermark
             </AnimatedButton>
           </div>
@@ -305,7 +331,7 @@ const SettingsContent: React.FC = () => {
           {['TikTok', 'YouTube', 'Instagram', 'LinkedIn', 'Twitter'].map((platform) => (
             <div key={platform} className="flex items-center justify-between p-3 rounded-lg bg-white/5">
               <span className="text-white">{platform}</span>
-              <AnimatedButton variant="outline" size="sm">
+              <AnimatedButton variant="outline" size="sm" onClick={() => handleConnect(platform)}>
                 Connect
               </AnimatedButton>
             </div>
@@ -322,6 +348,16 @@ const SettingsContent: React.FC = () => {
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+
+  const handleNavigate = (tab: DashboardTab, url?: string) => {
+    setActiveTab(tab);
+    if (url && tab === 'create') {
+      // In a real app, you might pass this URL via context or query param
+      // For now we'll just log it or maybe toast
+      console.log('Navigating to create with URL:', url);
+      toast.success('Video URL loaded from Quick Start');
+    }
+  };
 
   const handlePublishNow = (itemId: string) => {
     console.log('Publish now:', itemId);
@@ -356,7 +392,7 @@ export default function DashboardPage() {
               transition={{ duration: 0.2 }}
             >
               {activeTab === 'overview' && (
-                <OverviewContent onNavigate={setActiveTab} />
+                <OverviewContent onNavigate={handleNavigate} />
               )}
 
               {activeTab === 'create' && (

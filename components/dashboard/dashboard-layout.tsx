@@ -34,7 +34,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main content */}
       <div className={cn("transition-all duration-300 lg:ml-64")}>
         <TopBar onMenuClick={() => setSidebarOpen(true)} />
-        
+
         <main className="p-6">
           <div className="max-w-7xl mx-auto">
             {children}
